@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../context/AuthContext.jsx";
 import useLockBodyScroll from "../hooks/useLockBodyScroll.js";
@@ -16,12 +16,19 @@ import AlertModal from "../components/modals/AlertModal.jsx";
 
 export default function Resort() {
   const { user, login } = useAuth();
+  const isLoggedIn = !!user;
+
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const [bookingOpen, setBookingOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
 
   const [selectedRoom, setSelectedRoom] = useState("");
+
+  // ✅ if user clicks Book Now while logged out, remember intent
+  const [pendingBookingRoom, setPendingBookingRoom] = useState(null); // string | null
 
   const [contactAlert, setContactAlert] = useState({
     open: false,
@@ -37,21 +44,56 @@ export default function Resort() {
     message: "",
   });
 
-  const isLoggedIn = !!user;
-
-  // ✅ Prevent “can’t scroll” when modal closes
-  const anyOverlayOpen = bookingOpen || loginOpen || successOpen || contactAlert.open || newsletterAlert.open;
+  // ✅ Prevent “can’t scroll” when any modal/alert is open
+  const anyOverlayOpen =
+    bookingOpen || loginOpen || successOpen || contactAlert.open || newsletterAlert.open;
   useLockBodyScroll(anyOverlayOpen);
 
-  function openBooking(roomName = "") {
-    setSelectedRoom(roomName);
+  // ✅ Main booking gate
+  function requestBooking(roomName = "") {
+    if (!isLoggedIn) {
+      // store what user wanted to book, then ask them to login first
+      setPendingBookingRoom(roomName || "");
+      setLoginOpen(true);
+      return;
+    }
+
+    setSelectedRoom(roomName || "");
     setBookingOpen(true);
   }
 
   function handleLoginSuccess(u) {
-    login(u);            // ✅ global login
-    setLoginOpen(false); // ✅ close modal, stay on page
+    login(u);
+    setLoginOpen(false);
+
+    // if user was trying to book, open booking right after login
+    if (pendingBookingRoom !== null) {
+      const roomName = pendingBookingRoom;
+      setPendingBookingRoom(null);
+      setSelectedRoom(roomName || "");
+      setBookingOpen(true);
+    }
   }
+
+  // ✅ Handle Navbar Book Now: /resort?book=1
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const shouldBook = params.get("book") === "1";
+
+    if (!shouldBook) return;
+
+    // optional: allow /resort?book=1&room=Deluxe%20Ocean%20View
+    const roomFromUrl = params.get("room") || "";
+
+    // clear the flag so refresh doesn't reopen
+    params.delete("book");
+    params.delete("room");
+    navigate({ search: params.toString() }, { replace: true });
+
+    // trigger booking logic (with login gate)
+    requestBooking(roomFromUrl);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.search]);
 
   function submitContact(e) {
     e.preventDefault();
@@ -101,7 +143,7 @@ export default function Resort() {
 
   return (
     <div className="font-sans">
-      {/* Page padding because navbar is fixed in Layout */}
+      {/* Page padding because navbar is fixed */}
       <div className="pt-16">
         {/* HERO */}
         <section
@@ -123,7 +165,7 @@ export default function Resort() {
 
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <button
-                onClick={() => openBooking("")}
+                onClick={() => requestBooking("")}
                 className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-md text-lg font-medium"
               >
                 Book Your Stay
@@ -191,8 +233,8 @@ export default function Resort() {
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Accommodations</h2>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Choose from our selection of luxurious rooms and suites, each designed to provide the ultimate comfort
-                and relaxation.
+                Choose from our selection of luxurious rooms and suites, each designed to provide the ultimate comfort and
+                relaxation.
               </p>
             </div>
 
@@ -222,7 +264,7 @@ export default function Resort() {
                         <span className="text-gray-500 text-sm">/ night</span>
                       </div>
                       <button
-                        onClick={() => openBooking(r.name)}
+                        onClick={() => requestBooking(r.name)}
                         className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md text-sm font-medium"
                       >
                         Book Now
@@ -374,18 +416,10 @@ export default function Resort() {
                 <div className="mt-8">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Follow Us</h3>
                   <div className="flex space-x-4 text-xl">
-                    <a href="#" className="text-gray-500 hover:text-blue-600">
-                      f
-                    </a>
-                    <a href="#" className="text-gray-500 hover:text-blue-600">
-                      ig
-                    </a>
-                    <a href="#" className="text-gray-500 hover:text-blue-600">
-                      x
-                    </a>
-                    <a href="#" className="text-gray-500 hover:text-blue-600">
-                      ta
-                    </a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">f</a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">ig</a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">x</a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">ta</a>
                   </div>
                 </div>
               </div>
@@ -468,15 +502,26 @@ export default function Resort() {
         </section>
       </div>
 
-      {/* Modals (same page) */}
-      <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
+      {/* Modals */}
+      <LoginModal
+        open={loginOpen}
+        onClose={() => {
+          setLoginOpen(false);
+          // if user cancels login, clear pending booking intent
+          setPendingBookingRoom(null);
+        }}
+        onLoginSuccess={handleLoginSuccess}
+      />
 
       <BookingModal
         open={bookingOpen}
         onClose={() => setBookingOpen(false)}
         selectedRoom={selectedRoom}
         rooms={rooms}
-        onBooked={() => setSuccessOpen(true)}
+        onBooked={() => {
+          setBookingOpen(false);
+          setSuccessOpen(true);
+        }}
       />
 
       <SuccessModal open={successOpen} onClose={() => setSuccessOpen(false)} />
