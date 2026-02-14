@@ -10,12 +10,11 @@ export default function LoginModal({ open, onClose, onLoginSuccess }) {
 
   function submit(e) {
     e.preventDefault();
+  
     onLoginSuccess({
-      name: "Guest",
+      name: "Guest User",
       email,
-      phone: "+63 9xx xxx xxxx",
     });
-    onClose();
   }
 
   async function googleSignIn() {
@@ -24,7 +23,6 @@ export default function LoginModal({ open, onClose, onLoginSuccess }) {
     onLoginSuccess({
       name: "Google User",
       email: "google.user@example.com",
-      phone: "+1 (555) 987-6543",
     });
     setGoogleLoading(false);
     onClose();

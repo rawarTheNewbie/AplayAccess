@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useAuth } from "../context/AuthContext.jsx";
 import useLockBodyScroll from "../hooks/useLockBodyScroll.js";
 
 import { rooms } from "../data/rooms.js";
@@ -12,24 +13,34 @@ import LoginModal from "../components/modals/LoginModal.jsx";
 import BookingModal from "../components/modals/BookingModal.jsx";
 import SuccessModal from "../components/modals/SuccessModal.jsx";
 import AlertModal from "../components/modals/AlertModal.jsx";
-import GuestDashboard from "../components/modals/GuestDashboard.jsx";
 
 export default function Resort() {
+  const { user, login } = useAuth();
+
   const [bookingOpen, setBookingOpen] = useState(false);
   const [loginOpen, setLoginOpen] = useState(false);
   const [successOpen, setSuccessOpen] = useState(false);
-  const [dashboardOpen, setDashboardOpen] = useState(false);
 
   const [selectedRoom, setSelectedRoom] = useState("");
-  const [user, setUser] = useState(null);
 
-  const [contactAlert, setContactAlert] = useState({ open: false, type: "success", title: "Success", message: "" });
-  const [newsletterAlert, setNewsletterAlert] = useState({ open: false, type: "success", title: "Success", message: "" });
+  const [contactAlert, setContactAlert] = useState({
+    open: false,
+    type: "success",
+    title: "Success",
+    message: "",
+  });
+
+  const [newsletterAlert, setNewsletterAlert] = useState({
+    open: false,
+    type: "success",
+    title: "Success",
+    message: "",
+  });
 
   const isLoggedIn = !!user;
 
-  // ✅ prevents “can’t scroll” when modal closes
-  const anyOverlayOpen = bookingOpen || loginOpen || successOpen || dashboardOpen;
+  // ✅ Prevent “can’t scroll” when modal closes
+  const anyOverlayOpen = bookingOpen || loginOpen || successOpen || contactAlert.open || newsletterAlert.open;
   useLockBodyScroll(anyOverlayOpen);
 
   function openBooking(roomName = "") {
@@ -38,18 +49,18 @@ export default function Resort() {
   }
 
   function handleLoginSuccess(u) {
-    setUser(u);
-    setDashboardOpen(true);
-  }
-
-  function logout() {
-    setDashboardOpen(false);
-    setUser(null);
+    login(u);            // ✅ global login
+    setLoginOpen(false); // ✅ close modal, stay on page
   }
 
   function submitContact(e) {
     e.preventDefault();
-    setContactAlert({ open: true, type: "success", title: "Success", message: "Your message has been sent successfully!" });
+    setContactAlert({
+      open: true,
+      type: "success",
+      title: "Success",
+      message: "Your message has been sent successfully!",
+    });
     e.currentTarget.reset();
   }
 
@@ -59,12 +70,23 @@ export default function Resort() {
     const email = (emailInput?.value || "").trim();
 
     if (!email) {
-      setNewsletterAlert({ open: true, type: "error", title: "Error", message: "Please enter your email address." });
+      setNewsletterAlert({
+        open: true,
+        type: "error",
+        title: "Error",
+        message: "Please enter your email address.",
+      });
       return;
     }
+
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      setNewsletterAlert({ open: true, type: "error", title: "Error", message: "Please enter a valid email address." });
+      setNewsletterAlert({
+        open: true,
+        type: "error",
+        title: "Error",
+        message: "Please enter a valid email address.",
+      });
       return;
     }
 
@@ -98,6 +120,7 @@ export default function Resort() {
             <p className="text-xl md:text-2xl mb-8">
               Aplaya Beach Resort offers the perfect blend of luxury, comfort, and breathtaking ocean views.
             </p>
+
             <div className="flex flex-col sm:flex-row justify-center gap-4">
               <button
                 onClick={() => openBooking("")}
@@ -107,10 +130,12 @@ export default function Resort() {
               </button>
 
               <button
-                onClick={() => (isLoggedIn ? setDashboardOpen(true) : setLoginOpen(true))}
+                onClick={() => {
+                  if (!isLoggedIn) setLoginOpen(true);
+                }}
                 className="bg-white/20 hover:bg-white/30 text-white px-6 py-3 rounded-md text-lg font-medium backdrop-blur-sm"
               >
-                {isLoggedIn ? "My Account" : "Login"}
+                {isLoggedIn ? `Logged in as ${user?.name || "Guest"}` : "Login"}
               </button>
             </div>
           </div>
@@ -166,18 +191,23 @@ export default function Resort() {
             <div className="text-center mb-16">
               <h2 className="text-3xl font-bold text-gray-900 mb-4">Our Accommodations</h2>
               <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-                Choose from our selection of luxurious rooms and suites, each designed to provide the ultimate comfort and
-                relaxation.
+                Choose from our selection of luxurious rooms and suites, each designed to provide the ultimate comfort
+                and relaxation.
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               {rooms.map((r) => (
-                <div key={r.name} className="bg-white rounded-xl overflow-hidden shadow-md transition hover:-translate-y-2 hover:shadow-xl">
+                <div
+                  key={r.name}
+                  className="bg-white rounded-xl overflow-hidden shadow-md transition hover:-translate-y-2 hover:shadow-xl"
+                >
                   <div className="relative">
                     <img src={r.img} alt={r.name} className="w-full h-64 object-cover" loading="lazy" />
                     {r.badge ? (
-                      <div className={`absolute top-4 right-4 ${r.badge.className} text-white px-3 py-1 rounded-md text-sm font-medium`}>
+                      <div
+                        className={`absolute top-4 right-4 ${r.badge.className} text-white px-3 py-1 rounded-md text-sm font-medium`}
+                      >
                         {r.badge.text}
                       </div>
                     ) : null}
@@ -250,7 +280,10 @@ export default function Resort() {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               {testimonials.map((t) => (
-                <div key={t.name} className="bg-white/10 p-6 rounded-xl backdrop-blur-sm hover:scale-[1.03] transition">
+                <div
+                  key={t.name}
+                  className="bg-white/10 p-6 rounded-xl backdrop-blur-sm hover:scale-[1.03] transition"
+                >
                   <div className="flex items-center mb-4">
                     <div className="w-12 h-12 rounded-full overflow-hidden mr-4">
                       <img src={t.img} alt={t.name} className="w-full h-full object-cover" loading="lazy" />
@@ -308,7 +341,8 @@ export default function Resort() {
               <div className="lg:w-1/2 mb-10 lg:mb-0">
                 <h2 className="text-3xl font-bold text-gray-900 mb-6">Contact Us</h2>
                 <p className="text-gray-600 mb-6">
-                  Have questions or need assistance with your booking? Our team is here to help you plan your perfect getaway.
+                  Have questions or need assistance with your booking? Our team is here to help you plan your perfect
+                  getaway.
                 </p>
 
                 <div className="space-y-4 text-sm">
@@ -340,10 +374,18 @@ export default function Resort() {
                 <div className="mt-8">
                   <h3 className="text-lg font-medium text-gray-900 mb-4">Follow Us</h3>
                   <div className="flex space-x-4 text-xl">
-                    <a href="#" className="text-gray-500 hover:text-blue-600">f</a>
-                    <a href="#" className="text-gray-500 hover:text-blue-600">ig</a>
-                    <a href="#" className="text-gray-500 hover:text-blue-600">x</a>
-                    <a href="#" className="text-gray-500 hover:text-blue-600">ta</a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">
+                      f
+                    </a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">
+                      ig
+                    </a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">
+                      x
+                    </a>
+                    <a href="#" className="text-gray-500 hover:text-blue-600">
+                      ta
+                    </a>
                   </div>
                 </div>
               </div>
@@ -428,6 +470,7 @@ export default function Resort() {
 
       {/* Modals (same page) */}
       <LoginModal open={loginOpen} onClose={() => setLoginOpen(false)} onLoginSuccess={handleLoginSuccess} />
+
       <BookingModal
         open={bookingOpen}
         onClose={() => setBookingOpen(false)}
@@ -435,8 +478,8 @@ export default function Resort() {
         rooms={rooms}
         onBooked={() => setSuccessOpen(true)}
       />
+
       <SuccessModal open={successOpen} onClose={() => setSuccessOpen(false)} />
-      <GuestDashboard open={dashboardOpen} user={user} onClose={() => setDashboardOpen(false)} onLogout={logout} />
 
       <AlertModal
         open={contactAlert.open}
