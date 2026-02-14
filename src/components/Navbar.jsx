@@ -1,74 +1,79 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+
 import { useAuth } from "../context/AuthContext.jsx";
-import LoginModal from "./modals/LoginModal.jsx";
 import useLockBodyScroll from "../hooks/useLockBodyScroll.js";
+
+import LoginModal from "./modals/LoginModal.jsx";
+import SignupModal from "./modals/SignupModal.jsx";
 
 export default function Navbar() {
   const { user, login, logout } = useAuth();
-  const [loginOpen, setLoginOpen] = useState(false);
 
-  useLockBodyScroll(loginOpen);
+  const [loginOpen, setLoginOpen] = useState(false);
+  const [signupOpen, setSignupOpen] = useState(false);
+
+  // lock scroll for nav-triggered modals
+  useLockBodyScroll(loginOpen || signupOpen);
 
   function handleLoginSuccess(u) {
     login(u);
     setLoginOpen(false);
   }
 
+  function handleSignupSuccess(u) {
+    login(u); // auto-login after signup
+    setSignupOpen(false);
+  }
+
   return (
     <nav className="fixed w-full z-40 bg-white shadow-sm">
       <div className="max-w-7xl mx-auto px-4 h-16 flex justify-between items-center">
-
         <Link to="/" className="flex items-center gap-2">
           <span className="text-2xl">🏖️</span>
-          <span className="text-xl font-bold text-blue-600">
-            Aplaya Beach Resort
-          </span>
+          <span className="text-xl font-bold text-blue-600">Aplaya Beach Resort</span>
         </Link>
 
         <div className="flex items-center gap-4">
-
-          <Link
-            to="/resort"
-            className="text-gray-700 hover:text-blue-600 text-sm font-medium"
-          >
+          <Link to="/resort" className="text-gray-700 hover:text-blue-600 text-sm font-medium">
             Resort
           </Link>
-
-          <Link
-            to="/rooms"
-            className="text-gray-700 hover:text-blue-600 text-sm font-medium"
-          >
+          <Link to="/rooms" className="text-gray-700 hover:text-blue-600 text-sm font-medium">
             Rooms
           </Link>
-
-          <Link
-            to="/gallery"
-            className="text-gray-700 hover:text-blue-600 text-sm font-medium"
-          >
+          <Link to="/gallery" className="text-gray-700 hover:text-blue-600 text-sm font-medium">
             Gallery
           </Link>
 
           {user ? (
             <>
-              <span className="text-sm text-gray-700">
-                👤 {user.name || "Guest"}
-              </span>
-
+              <span className="text-sm text-gray-700">👤 {user.name || "Guest"}</span>
               <button
                 onClick={logout}
                 className="text-sm font-medium text-red-600 hover:text-red-800"
+                type="button"
               >
                 Logout
               </button>
             </>
           ) : (
-            <button
-              onClick={() => setLoginOpen(true)}
-              className="text-gray-700 hover:text-blue-600 text-sm font-medium"
-            >
-              Login
-            </button>
+            <>
+              <button
+                onClick={() => setLoginOpen(true)}
+                className="text-gray-700 hover:text-blue-600 text-sm font-medium"
+                type="button"
+              >
+                Login
+              </button>
+
+              <button
+                onClick={() => setSignupOpen(true)}
+                className="text-gray-700 hover:text-blue-600 text-sm font-medium"
+                type="button"
+              >
+                Sign Up
+              </button>
+            </>
           )}
 
           <Link
@@ -84,6 +89,12 @@ export default function Navbar() {
         open={loginOpen}
         onClose={() => setLoginOpen(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+
+      <SignupModal
+        open={signupOpen}
+        onClose={() => setSignupOpen(false)}
+        onSignedUp={handleSignupSuccess}
       />
     </nav>
   );
