@@ -65,8 +65,17 @@ export default function Resort() {
   function handleLoginSuccess(u) {
     login(u);
     setLoginOpen(false);
-
-    // if user was trying to book, open booking right after login
+  
+    const params = new URLSearchParams(location.search);
+    const next = params.get("next");
+  
+    // ✅ If user was redirected to login to access dashboard
+    if (next) {
+      navigate(next, { replace: true });
+      return;
+    }
+  
+    // ✅ If user was trying to book before login
     if (pendingBookingRoom !== null) {
       const roomName = pendingBookingRoom;
       setPendingBookingRoom(null);
