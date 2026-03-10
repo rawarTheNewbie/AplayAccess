@@ -1,11 +1,18 @@
 import axios from "axios";
 
+export const TOKEN_KEY = "aplaya_token";
+
 export const api = axios.create({
   baseURL: "http://localhost:8000",
-  withCredentials: true, // important for Sanctum cookie auth
+  withCredentials: false,
   headers: { Accept: "application/json" },
 });
 
-// Laravel Sanctum defaults:
-api.defaults.xsrfCookieName = "XSRF-TOKEN";
-api.defaults.xsrfHeaderName = "X-XSRF-TOKEN";
+// Attach Bearer token to every request if one is stored
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem(TOKEN_KEY);
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
