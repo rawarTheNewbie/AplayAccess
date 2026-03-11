@@ -30,6 +30,7 @@ export default function Messages() {
 
   const [reply, setReply]       = useState("");
   const [sending, setSending]   = useState(false);
+  const [replyError, setReplyError] = useState("");
 
   const [newMsgOpen, setNewMsgOpen] = useState(false);
   const [pwdOpen, setPwdOpen]       = useState(false);
@@ -38,8 +39,9 @@ export default function Messages() {
   const [composeSending, setComposeSending] = useState(false);
   const [composeError, setComposeError]     = useState("");
 
-  const [pwd, setPwd]         = useState({ currentPassword: "", newPassword: "", confirm: "" });
+  const [pwd, setPwd]           = useState({ currentPassword: "", newPassword: "", confirm: "" });
   const [pwdError, setPwdError]   = useState("");
+  const [pwdSuccess, setPwdSuccess] = useState(false);
   const [pwdSaving, setPwdSaving] = useState(false);
 
   // Load threads on mount
@@ -71,6 +73,7 @@ export default function Messages() {
   async function sendReply() {
     const text = reply.trim();
     if (!text || !current || sending) return;
+    setReplyError("");
     setSending(true);
     try {
       const res = await replyMessage(current.id, text);
@@ -88,7 +91,7 @@ export default function Messages() {
       );
       setReply("");
     } catch {
-      alert("Failed to send reply. Please try again.");
+      setReplyError("Failed to send reply. Please try again.");
     } finally {
       setSending(false);
     }
@@ -132,9 +135,12 @@ export default function Messages() {
     setPwdSaving(true);
     try {
       await changePassword(pwd.currentPassword, pwd.newPassword);
-      setPwdOpen(false);
+      setPwdSuccess(true);
       setPwd({ currentPassword: "", newPassword: "", confirm: "" });
-      alert("Password changed successfully!");
+      setTimeout(() => {
+        setPwdOpen(false);
+        setPwdSuccess(false);
+      }, 1500);
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
@@ -241,6 +247,9 @@ export default function Messages() {
 
           {/* Reply input */}
           <div className="p-4 border-t bg-white">
+            {replyError && (
+              <p className="mb-2 text-sm text-red-600">{replyError}</p>
+            )}
             <div className="flex gap-2">
               <input
                 value={reply}
@@ -301,8 +310,13 @@ export default function Messages() {
       </Modal>
 
       {/* Change Password modal */}
-      <Modal open={pwdOpen} title="Change Password" onClose={() => { setPwdOpen(false); setPwdError(""); }}>
+      <Modal open={pwdOpen} title="Change Password" onClose={() => { setPwdOpen(false); setPwdError(""); setPwdSuccess(false); }}>
         <form onSubmit={submitChangePassword} className="space-y-4">
+          {pwdSuccess ? (
+            <div className="rounded-md bg-green-50 border border-green-200 px-3 py-2 text-sm text-green-700 font-medium">
+              ✓ Password changed successfully!
+            </div>
+          ) : null}
           {pwdError ? (
             <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">{pwdError}</div>
           ) : null}
