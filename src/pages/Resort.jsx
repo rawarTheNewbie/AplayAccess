@@ -8,7 +8,7 @@ import { api } from "../lib/api.js";
 // Local data for UI enrichment + offline fallback
 import { rooms as roomsFallback } from "../data/rooms.js";
 import { amenities as amenitiesFallback } from "../data/amenities.js";
-import { gallery } from "../data/gallery.js";
+import { gallery as galleryFallback } from "../data/gallery.js";
 import { testimonials } from "../data/testimonials.js";
 
 import LoginModal from "../components/modals/LoginModal.jsx";
@@ -101,6 +101,8 @@ export default function Resort() {
   // API-backed lists (fallback if API is down)
   const [roomsApi, setRoomsApi] = useState([]);
   const [amenitiesApi, setAmenitiesApi] = useState([]);
+  const [galleryApi, setGalleryApi] = useState([]);
+  const [reviewsApi, setReviewsApi] = useState([]);
 
   const anyOverlayOpen =
     bookingOpen || loginOpen || successOpen || contactAlert.open;
@@ -131,6 +133,31 @@ export default function Resort() {
     }
     return amenitiesFallback;
   }, [amenitiesApi]);
+
+  // Normalize gallery items to { src, alt, caption }
+  const galleryDisplay = useMemo(() => {
+    const base = galleryApi.length ? galleryApi : galleryFallback;
+    return base.slice(0, 6).map((g) => ({
+      src: g.image_url ?? g.src,
+      alt: g.caption ?? g.alt ?? "Gallery image",
+      caption: g.caption ?? "",
+    }));
+  }, [galleryApi]);
+
+  // Normalize reviews / fallback testimonials to { name, img, stars, quote }
+  const testimonialsDisplay = useMemo(() => {
+    if (reviewsApi.length) {
+      return reviewsApi.slice(0, 3).map((r) => ({
+        name: r.user_name ?? "Guest",
+        img:
+          r.user_avatar ??
+          `https://ui-avatars.com/api/?name=${encodeURIComponent(r.user_name ?? "Guest")}&background=3b82f6&color=fff`,
+        stars: "★".repeat(Math.min(5, Math.max(1, Number(r.rating || 5)))),
+        quote: r.comment ?? "",
+      }));
+    }
+    return testimonials;
+  }, [reviewsApi]);
 
   function requestBooking(roomName = "") {
     if (!isLoggedIn) {
@@ -193,21 +220,27 @@ export default function Resort() {
 
     async function loadResortData() {
       try {
-        const [roomsRes, amenitiesRes] = await Promise.all([
+        const [roomsRes, amenitiesRes, galleryRes, reviewsRes] = await Promise.all([
           api.get(`/api/resorts/${RESORT_ID}/rooms`),
           api.get(`/api/resorts/${RESORT_ID}/amenities`),
+          api.get(`/api/resorts/${RESORT_ID}/gallery`),
+          api.get(`/api/resorts/${RESORT_ID}/reviews`),
         ]);
 
         if (!alive) return;
 
         setRoomsApi(normalizeApiList(roomsRes.data));
         setAmenitiesApi(normalizeApiList(amenitiesRes.data));
+        setGalleryApi(normalizeApiList(galleryRes.data));
+        setReviewsApi(normalizeApiList(reviewsRes.data));
       } catch (e) {
         // Silent fallback only (no banner)
         if (!alive) return;
         console.warn("Resort API load failed, using local fallback:", e?.message || e);
         setRoomsApi([]);
         setAmenitiesApi([]);
+        setGalleryApi([]);
+        setReviewsApi([]);
       }
     }
 
@@ -356,7 +389,7 @@ export default function Resort() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-              {roomCards.map((r) => (
+              {roomCards.slice(0, 3).map((r) => (
                 <div
                   key={r.id ?? r.name}
                   className="bg-white rounded-xl overflow-hidden shadow-md transition hover:-translate-y-2 hover:shadow-xl"
@@ -438,9 +471,9 @@ export default function Resort() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              {testimonials.map((t) => (
+              {testimonialsDisplay.map((t, i) => (
                 <div
-                  key={t.name}
+                  key={`${t.name}-${i}`}
                   className="bg-white/10 p-6 rounded-xl backdrop-blur-sm hover:scale-[1.03] transition"
                 >
                   <div className="flex items-center mb-4">
@@ -468,8 +501,8 @@ export default function Resort() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-              {gallery.map((g) => (
-                <div key={g.alt} className="rounded-xl overflow-hidden shadow-lg">
+              {galleryDisplay.map((g, i) => (
+                <div key={`${g.alt}-${i}`} className="rounded-xl overflow-hidden shadow-lg">
                   <img
                     src={g.src}
                     alt={g.alt}

@@ -24,3 +24,13 @@ export async function getResortRoomTypes(resortId) {
   const res = await api.get(`/api/resorts/${resortId}/room-types`);
   return res.data?.data ?? res.data;
 }
+
+export async function getResortGallery(resortId) {
+  const res = await api.get(`/api/resorts/${resortId}/gallery`);
+  return res.data?.data ?? res.data;
+}
+
+export async function getResortReviews(resortId) {
+  const res = await api.get(`/api/resorts/${resortId}/reviews`);
+  return res.data?.data ?? res.data;
+}

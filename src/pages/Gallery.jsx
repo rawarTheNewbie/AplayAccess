@@ -1,13 +1,33 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import useLockBodyScroll from "../hooks/useLockBodyScroll.js";
-import { gallery } from "../data/gallery.js";
+import { gallery as galleryFallback } from "../data/gallery.js";
+import { getResortGallery } from "../lib/resortApi.js";
 import LightboxModal from "../components/modals/LightboxModal.jsx";
 
+const RESORT_ID = 1;
+
 export default function Gallery() {
-  const items = useMemo(() => gallery, []);
+  const [galleryApi, setGalleryApi] = useState([]);
   const [open, setOpen] = useState(false);
   const [index, setIndex] = useState(0);
+
+  // Load gallery from API; fall back to static data silently
+  useEffect(() => {
+    getResortGallery(RESORT_ID)
+      .then((data) => { if (Array.isArray(data) && data.length) setGalleryApi(data); })
+      .catch(() => {});
+  }, []);
+
+  // Normalize API items ({ image_url, caption }) or static items ({ src, alt, caption })
+  const items = useMemo(() => {
+    const base = galleryApi.length ? galleryApi : galleryFallback;
+    return base.map((g) => ({
+      src: g.image_url ?? g.src,
+      alt: g.caption ?? g.alt ?? "Gallery image",
+      caption: g.caption ?? g.alt ?? "",
+    }));
+  }, [galleryApi]);
 
   useLockBodyScroll(open);
 
