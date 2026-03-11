@@ -51,6 +51,81 @@ function StarRating({ value, onChange }) {
   );
 }
 
+// ─── Cancel confirm modal ─────────────────────────────────────────────────────
+function CancelModal({ booking, onClose, onConfirmed }) {
+  useLockBodyScroll(true);
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError]           = useState("");
+
+  async function handleConfirm() {
+    setError("");
+    setCancelling(true);
+    try {
+      await cancelBooking(booking.booking_id);
+      onConfirmed(booking.booking_id);
+      onClose();
+    } catch (err) {
+      const msg =
+        err?.response?.data?.message ||
+        "Failed to cancel booking. Please try again.";
+      setError(msg);
+    } finally {
+      setCancelling(false);
+    }
+  }
+
+  return (
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      onMouseDown={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="min-h-screen flex items-center justify-center px-4 py-10">
+        <div className="absolute inset-0 bg-gray-500/75" />
+        <div className="relative bg-white w-full max-w-sm rounded-lg shadow-xl">
+          <div className="p-5 flex items-center justify-between border-b">
+            <h3 className="text-lg font-bold text-gray-900">Cancel Booking</h3>
+            <button onClick={onClose} className="text-gray-500 hover:text-gray-700">✕</button>
+          </div>
+          <div className="p-5 space-y-4">
+            <p className="text-sm text-gray-700">
+              Are you sure you want to cancel booking{" "}
+              <span className="font-semibold text-gray-900">{booking.id}</span>?
+            </p>
+            <div className="bg-yellow-50 border-l-4 border-yellow-400 p-3 text-sm text-yellow-800">
+              The ₱150.00 reservation fee is <span className="font-medium">non-refundable</span> upon cancellation.
+            </div>
+
+            {error ? (
+              <div className="rounded-md bg-red-50 border border-red-200 px-3 py-2 text-sm text-red-700">
+                {error}
+              </div>
+            ) : null}
+
+            <div className="flex justify-end gap-2 pt-1">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={cancelling}
+                className="px-4 py-2 rounded-md bg-gray-100 hover:bg-gray-200 text-sm disabled:opacity-60"
+              >
+                Keep Booking
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirm}
+                disabled={cancelling}
+                className="px-4 py-2 rounded-md bg-red-600 hover:bg-red-700 disabled:opacity-60 text-white text-sm font-medium"
+              >
+                {cancelling ? "Cancelling..." : "Yes, Cancel"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Review modal ─────────────────────────────────────────────────────────────
 function ReviewModal({ booking, onClose, onSubmitted }) {
   useLockBodyScroll(true);
@@ -153,7 +228,8 @@ export default function MyBookings() {
   const [items, setItems]         = useState([]);
   const [loading, setLoading]     = useState(true);
   const [error, setError]         = useState("");
-  const [reviewing, setReviewing] = useState(null); // booking object being reviewed
+  const [reviewing, setReviewing] = useState(null); // booking object for review modal
+  const [cancelling, setCancelling] = useState(null); // booking object for cancel modal
 
   useEffect(() => {
     getBookings()
@@ -162,16 +238,10 @@ export default function MyBookings() {
       .finally(() => setLoading(false));
   }, []);
 
-  async function handleCancel(bookingId, formattedId) {
-    if (!confirm(`Cancel booking ${formattedId}?`)) return;
-    try {
-      await cancelBooking(bookingId);
-      setItems((prev) =>
-        prev.map((b) => (b.booking_id === bookingId ? { ...b, status: "Cancelled" } : b))
-      );
-    } catch {
-      alert("Failed to cancel booking. Please try again.");
-    }
+  function handleCancelConfirmed(bookingId) {
+    setItems((prev) =>
+      prev.map((b) => (b.booking_id === bookingId ? { ...b, status: "Cancelled" } : b))
+    );
   }
 
   function handleReviewSubmitted(bookingId, review) {
@@ -235,7 +305,7 @@ export default function MyBookings() {
                     {b.status !== "Cancelled" && b.status !== "Completed" && (
                       <button
                         className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded hover:bg-red-200"
-                        onClick={() => handleCancel(b.booking_id, b.id)}
+                        onClick={() => setCancelling(b)}
                       >
                         Cancel
                       </button>
@@ -275,6 +345,15 @@ export default function MyBookings() {
           </tbody>
         </table>
       </div>
+
+      {/* Cancel confirm modal */}
+      {cancelling && (
+        <CancelModal
+          booking={cancelling}
+          onClose={() => setCancelling(null)}
+          onConfirmed={handleCancelConfirmed}
+        />
+      )}
 
       {/* Review modal */}
       {reviewing && (
