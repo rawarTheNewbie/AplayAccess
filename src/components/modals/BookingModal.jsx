@@ -15,9 +15,10 @@ const TIME_SLOTS = [
   { label: "2:00 PM",  value: "14:00", end: "10:00 PM" },
 ];
 
-const SLOT_RATE       = 1500; // full 8-hour rate
-const RESERVATION_FEE = 150;  // due now (holds the slot)
-const BALANCE_DUE     = SLOT_RATE - RESERVATION_FEE; // 1350 — due at check-in
+const BASE_RATE        = 1500; // base 8-hour rate (up to 5 guests)
+const RESERVATION_FEE  = 150;  // fixed deposit due now via PayMongo
+const FREE_GUESTS      = 5;    // no extra charge up to this count
+const EXTRA_GUEST_RATE = 50;   // ₱50 per guest above FREE_GUESTS
 
 function formatPHP(n) {
   return `₱${Number(n || 0).toLocaleString("en-PH", {
@@ -44,11 +45,14 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
   const [email, setEmail]           = useState("");
   const [phone, setPhone]           = useState("");
   const [specialRequests, setSpecialRequests] = useState("");
-  const [paymentMethod, setPaymentMethod]     = useState("Online");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError]           = useState("");
 
-  const selectedSlot = TIME_SLOTS.find((s) => s.value === visitTime) ?? TIME_SLOTS[2];
+  const selectedSlot  = TIME_SLOTS.find((s) => s.value === visitTime) ?? TIME_SLOTS[2];
+  const extraGuests   = Math.max(0, guests - FREE_GUESTS);
+  const extraCharge   = extraGuests * EXTRA_GUEST_RATE;
+  const totalRate     = BASE_RATE + extraCharge;
+  const balanceDue    = totalRate - RESERVATION_FEE;
 
   useEffect(() => {
     if (open) {
@@ -87,33 +91,15 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
         room_id:          room.id,
         check_in:         checkIn,
         guests:           guests,
-        payment_method:   paymentMethod,
+        payment_method:   "Online",
         special_requests: specialRequests || null,
       });
 
       const bookingId = result.data?.id;
 
-      // Step 2 — if Online, create a PayMongo Payment Link and redirect
-      if (paymentMethod === "Online" && bookingId) {
-        const { checkout_url } = await createPaymentLink(bookingId);
-        window.location.href = checkout_url; // browser navigates to PayMongo's checkout
-        return;
-      }
-
-      // Step 3 — cash / other methods: show success modal as before
-      onClose();
-      onBooked({
-        checkIn:  `${visitDate} · ${selectedSlot.label}`,
-        checkOut: `${visitDate} · ${selectedSlot.end}`,
-        roomType,
-        guests,
-        paymentMethod,
-        totals: {
-          reservationFee: RESERVATION_FEE,
-          balanceDue:     BALANCE_DUE,
-        },
-        bookingData: result.data,
-      });
+      // Step 2 — create PayMongo Payment Link and redirect to checkout
+      const { checkout_url } = await createPaymentLink(bookingId);
+      window.location.href = checkout_url;
     } catch (err) {
       const msg =
         err?.response?.data?.message ||
@@ -292,8 +278,20 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
               <div className="bg-blue-50 p-4 rounded-md mb-4">
                 <h4 className="font-medium text-gray-900 mb-2">Payment Summary</h4>
                 <div className="flex justify-between mb-1 text-sm">
-                  <span className="text-gray-600">8-Hour Slot Rate:</span>
-                  <span className="font-medium">{formatPHP(SLOT_RATE)}</span>
+                  <span className="text-gray-600">Base Rate (up to 5 guests):</span>
+                  <span className="font-medium">{formatPHP(BASE_RATE)}</span>
+                </div>
+                {extraGuests > 0 && (
+                  <div className="flex justify-between mb-1 text-sm">
+                    <span className="text-orange-600">
+                      Extra guests ({extraGuests} × ₱{EXTRA_GUEST_RATE}):
+                    </span>
+                    <span className="text-orange-600 font-medium">+ {formatPHP(extraCharge)}</span>
+                  </div>
+                )}
+                <div className="flex justify-between mb-1 text-sm font-medium border-t border-blue-200 pt-2 mt-1">
+                  <span className="text-gray-700">Total Rate:</span>
+                  <span className="text-gray-900">{formatPHP(totalRate)}</span>
                 </div>
                 <div className="flex justify-between border-t border-blue-200 pt-2 mt-2">
                   <span className="text-gray-900 font-bold">Reservation Fee (Due Now):</span>
@@ -301,46 +299,17 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
                 </div>
                 <div className="flex justify-between mt-1 text-sm">
                   <span className="text-gray-600">Balance Due at Check-in:</span>
-                  <span className="text-gray-900 font-medium">{formatPHP(BALANCE_DUE)}</span>
+                  <span className="text-gray-900 font-medium">{formatPHP(balanceDue)}</span>
                 </div>
               </div>
 
-              {/* Payment method */}
-              <label className="block text-sm font-medium text-gray-700 mb-3">
-                Payment Method <span className="text-red-500">*</span>
-              </label>
-              <div className="space-y-3">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="Online"
-                    checked={paymentMethod === "Online"}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm text-gray-800">
-                    <span className="font-medium">Pay Online</span>
-                    <span className="text-gray-400 font-normal ml-1">(GCash · Maya · Credit/Debit Card)</span>
-                    <br />
-                    <span className="text-xs text-gray-400">You will be redirected to a secure PayMongo checkout page.</span>
-                  </span>
-                </label>
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="paymentMethod"
-                    value="Cash"
-                    checked={paymentMethod === "Cash"}
-                    onChange={(e) => setPaymentMethod(e.target.value)}
-                    className="mt-0.5"
-                  />
-                  <span className="text-sm text-gray-800">
-                    <span className="font-medium">Cash on Arrival</span>
-                    <br />
-                    <span className="text-xs text-gray-400">Pay the full ₱1,500.00 at the resort on your visit date.</span>
-                  </span>
-                </label>
+              {/* Payment info */}
+              <div className="flex items-start gap-2 text-sm text-gray-600 bg-gray-50 rounded-md px-3 py-2">
+                <span className="text-blue-500 mt-0.5">🔒</span>
+                <span>
+                  You will be redirected to a secure <span className="font-medium">PayMongo</span> checkout page to pay the
+                  reservation fee via <span className="font-medium">GCash, Maya, or Credit/Debit Card</span>.
+                </span>
               </div>
             </div>
           </div>
@@ -349,13 +318,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
             disabled={submitting}
             className="mt-6 w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-3 px-4 rounded-md"
           >
-            {submitting
-              ? paymentMethod === "Online"
-                ? "Redirecting to checkout..."
-                : "Processing..."
-              : paymentMethod === "Online"
-              ? "Pay ₱150.00 Online →"
-              : "Complete Booking"}
+            {submitting ? "Redirecting to checkout..." : `Pay ${formatPHP(RESERVATION_FEE)} Online →`}
           </button>
         </form>
       </div>
