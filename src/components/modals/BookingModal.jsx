@@ -1,6 +1,10 @@
 import { useEffect, useState } from "react";
 import Modal from "./Modal.jsx";
 import { createBooking } from "../../lib/bookingApi.js";
+import { createPaymentSource } from "../../lib/paymentApi.js";
+
+// Payment methods that redirect to PayMongo checkout
+const ONLINE_METHODS = ["GCash", "PayMaya"];
 
 // Available start times for an 8-hour slot
 const TIME_SLOTS = [
@@ -81,6 +85,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
 
     setSubmitting(true);
     try {
+      // Step 1 — create the booking record
       const result = await createBooking({
         room_id:          room.id,
         check_in:         checkIn,
@@ -89,6 +94,18 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
         special_requests: specialRequests || null,
       });
 
+      const bookingId = result.data?.id;
+
+      // Step 2 — if GCash or Maya, redirect to PayMongo checkout
+      if (ONLINE_METHODS.includes(paymentMethod) && bookingId) {
+        const sourceType = paymentMethod === "GCash" ? "gcash" : "paymaya";
+        const { checkout_url } = await createPaymentSource(bookingId, sourceType);
+        // Redirect the whole page to PayMongo's hosted checkout
+        window.location.href = checkout_url;
+        return; // don't close the modal yet — browser is navigating away
+      }
+
+      // Step 3 — cash / other methods: show success modal as before
       onClose();
       onBooked({
         checkIn:  `${visitDate} · ${selectedSlot.label}`,
@@ -306,7 +323,9 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
                     checked={paymentMethod === "GCash"}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                   />
-                  <span className="text-sm text-gray-800">GCash</span>
+                  <span className="text-sm text-gray-800">
+                    GCash <span className="text-xs text-gray-400">(redirects to secure checkout)</span>
+                  </span>
                 </label>
                 <label className="flex items-center gap-3">
                   <input
@@ -316,7 +335,9 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
                     checked={paymentMethod === "PayMaya"}
                     onChange={(e) => setPaymentMethod(e.target.value)}
                   />
-                  <span className="text-sm text-gray-800">PayMaya</span>
+                  <span className="text-sm text-gray-800">
+                    Maya <span className="text-xs text-gray-400">(redirects to secure checkout)</span>
+                  </span>
                 </label>
               </div>
             </div>
@@ -326,7 +347,13 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
             disabled={submitting}
             className="mt-6 w-full bg-blue-600 hover:bg-blue-700 disabled:opacity-60 text-white font-medium py-3 px-4 rounded-md"
           >
-            {submitting ? "Processing..." : "Complete Booking"}
+            {submitting
+              ? ONLINE_METHODS.includes(paymentMethod)
+                ? "Redirecting to checkout..."
+                : "Processing..."
+              : ONLINE_METHODS.includes(paymentMethod)
+              ? `Pay ₱150.00 via ${paymentMethod} →`
+              : "Complete Booking"}
           </button>
         </form>
       </div>

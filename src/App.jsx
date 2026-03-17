@@ -8,6 +8,7 @@ import Gallery from "./pages/Gallery.jsx";
 import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
+import PaymentReturn from "./pages/PaymentReturn.jsx";
 
 // Dashboard (protected)
 import RequireAuth from "./components/auth/RequireAuth.jsx";
@@ -28,6 +29,10 @@ export default function App() {
         <Route path="/signup" element={<Signup />} />
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
+
+        {/* PayMongo return pages */}
+        <Route path="/payment/success" element={<PaymentReturn outcome="success" />} />
+        <Route path="/payment/failed"  element={<PaymentReturn outcome="failed" />} />
 
         {/* ✅ Dashboard routes (protected), still inside Layout */}
         <Route
