@@ -9,6 +9,7 @@ import Signup from "./pages/Signup.jsx";
 import Login from "./pages/Login.jsx";
 import ForgotPassword from "./pages/ForgotPassword.jsx";
 
+// Dashboard (protected)
 import RequireAuth from "./components/auth/RequireAuth.jsx";
 import DashboardShell from "./components/dashboard/DashboardShell.jsx";
 import GuestDashboard from "./pages/dashboard/GuestDashboard.jsx";
@@ -30,7 +31,7 @@ export default function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
 
-        {/* Guest dashboard routes (protected) */}
+        {/* Dashboard routes (protected) */}
         <Route
           path="/dashboard"
           element={
@@ -46,7 +47,7 @@ export default function App() {
         </Route>
       </Route>
 
-      {/* Staff portal – all routes live under /staff/* */}
+      {/* Staff portal - all routes live under /staff/* */}
       <Route path="/staff/*" element={<StaffApp />} />
     </Routes>
   );
