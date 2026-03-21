@@ -1,9 +1,20 @@
 import React, { useState } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { notifications } from '../../data/dashboardData';
 
 const Header = ({ pageTitle, onAccountSettings }) => {
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const { user, logout } = useAuth();
+
+  const handleLogout = async () => {
+    await logout();
+    window.location.href = '/login';
+  };
+
+  const displayName = user?.name || 'User';
+  const displayEmail = user?.email || '';
+  const avatarUrl = user?.avatar || null;
 
   return (
     <header className="header">
@@ -61,12 +72,29 @@ const Header = ({ pageTitle, onAccountSettings }) => {
               onClick={() => setShowUserMenu(!showUserMenu)}
               className="user-menu-btn"
             >
-              <img
-                src="https://randomuser.me/api/portraits/women/44.jpg"
-                alt="User"
-                className="user-menu-avatar"
-              />
-              <span className="user-menu-name">Sarah Johnson</span>
+              {avatarUrl ? (
+                <img
+                  src={avatarUrl}
+                  alt={displayName}
+                  className="user-menu-avatar"
+                />
+              ) : (
+                <div
+                  className="user-menu-avatar"
+                  style={{
+                    background: '#3b82f6',
+                    color: '#fff',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontWeight: 700,
+                    fontSize: '1rem',
+                  }}
+                >
+                  {displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="user-menu-name">{displayName}</span>
               <i className="fas fa-chevron-down user-menu-chevron"></i>
             </button>
 
@@ -74,7 +102,7 @@ const Header = ({ pageTitle, onAccountSettings }) => {
               <div className="user-menu-dropdown">
                 <div className="user-menu-header">
                   <p className="user-menu-header-label">Signed in as</p>
-                  <p className="user-menu-header-email">sarah@aplaya-resort.com</p>
+                  <p className="user-menu-header-email">{displayEmail}</p>
                 </div>
                 <button
                   onClick={onAccountSettings}
@@ -83,9 +111,9 @@ const Header = ({ pageTitle, onAccountSettings }) => {
                   <i className="fas fa-user-cog"></i> Account Settings
                 </button>
                 <div className="user-menu-divider"></div>
-                <a href="#" className="user-menu-item logout">
+                <button onClick={handleLogout} className="user-menu-item logout">
                   <i className="fas fa-sign-out-alt"></i> Log Out
-                </a>
+                </button>
               </div>
             )}
           </div>

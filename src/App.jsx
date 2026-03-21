@@ -21,6 +21,7 @@ import Messages from "./pages/dashboard/Messages.jsx";
 import OwnerDashboard from "./pages/owner/Dashboard.jsx";
 import OwnerFinancials from "./pages/owner/Financials.jsx";
 import OwnerTransactions from "./pages/owner/Transactions.jsx";
+import StaffLogin from "./pages/StaffLogin.jsx";
 
 export default function App() {
   return (
@@ -50,6 +51,9 @@ export default function App() {
           <Route path="messages" element={<Messages />} />
         </Route>
       </Route>
+
+      {/* Staff login */}
+      <Route path="/staff/login" element={<StaffLogin />} />
 
       {/* Owner dashboard routes (standalone — uses its own Sidebar/Header layout) */}
       <Route path="/owner" element={<OwnerDashboard />} />

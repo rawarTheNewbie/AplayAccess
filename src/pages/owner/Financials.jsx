@@ -1,39 +1,81 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import MainLayout from '../../components/layout/MainLayout';
-import { Pie, Line } from 'react-chartjs-2';
-import { financialSummary, financialRecords, revenueCategoryData, comparisonData } from '../../data/financialData';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js';
+import { Line } from 'react-chartjs-2';
+import { getOverview, getBookingsChart } from '../../lib/ownerApi';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Tooltip,
+  Legend,
+} from 'chart.js';
 
-ChartJS.register(ArcElement, Tooltip, Legend);
+ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, Tooltip, Legend);
+
+const fmt = (v) => `₱${Number(v || 0).toLocaleString('en-PH', { minimumFractionDigits: 0 })}`;
+
+const lineOptions = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: { legend: { position: 'top' } },
+};
 
 const Financials = () => {
-  const pieOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'bottom'
-      }
-    }
+  const [overview, setOverview]   = useState(null);
+  const [chartData, setChartData] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [error, setError]         = useState(null);
+  const [chartDays, setChartDays] = useState(30);
+
+  useEffect(() => {
+    setLoading(true);
+    Promise.all([getOverview(), getBookingsChart(chartDays)])
+      .then(([o, c]) => { setOverview(o); setChartData(c); })
+      .catch(() => setError('Failed to load financial data.'))
+      .finally(() => setLoading(false));
+  }, [chartDays]);
+
+  if (loading) return <MainLayout pageTitle="Financial Reports"><div style={{ textAlign: 'center', padding: '3rem', color: '#666' }}>Loading...</div></MainLayout>;
+  if (error)   return <MainLayout pageTitle="Financial Reports"><div style={{ textAlign: 'center', padding: '3rem', color: '#e53e3e' }}>{error}</div></MainLayout>;
+
+  const revenuePct = overview.revenue_last_month
+    ? Math.round(((overview.revenue_this_month - overview.revenue_last_month) / overview.revenue_last_month) * 100)
+    : null;
+  const bookingsDiff = overview.bookings_this_month - overview.bookings_last_month;
+
+  const revenueLineData = {
+    labels: chartData.map(d => d.date),
+    datasets: [{
+      label: 'Revenue (₱)',
+      data: chartData.map(d => Number(d.revenue || 0)),
+      borderColor: 'rgba(59, 130, 246, 0.8)',
+      backgroundColor: 'rgba(59, 130, 246, 0.1)',
+      tension: 0.3,
+      fill: true,
+    }],
   };
 
-  const lineOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top'
-      }
-    }
+  const bookingsLineData = {
+    labels: chartData.map(d => d.date),
+    datasets: [{
+      label: 'Bookings',
+      data: chartData.map(d => Number(d.bookings || 0)),
+      borderColor: 'rgba(16, 185, 129, 0.8)',
+      backgroundColor: 'rgba(16, 185, 129, 0.1)',
+      tension: 0.3,
+      fill: true,
+    }],
   };
 
   return (
     <MainLayout pageTitle="Financial Reports">
       <div className="bg-white rounded-lg shadow p-6">
         <h2 className="text-xl font-semibold mb-6">Financial Reports</h2>
-        
+
+        {/* Summary Cards */}
         <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-4">
-          {/* Revenue Summary */}
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-2">
               <h3 className="font-medium text-blue-800">Revenue Summary</h3>
@@ -41,159 +83,136 @@ const Financials = () => {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm">Room Revenue</span>
-                <span className="text-sm font-medium">{financialSummary.revenue.roomRevenue}</span>
+                <span className="text-sm">This Month</span>
+                <span className="text-sm font-medium">{fmt(overview.revenue_this_month)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm">Food & Beverage</span>
-                <span className="text-sm font-medium">{financialSummary.revenue.foodBeverage}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Activities</span>
-                <span className="text-sm font-medium">{financialSummary.revenue.activities}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Other Services</span>
-                <span className="text-sm font-medium">{financialSummary.revenue.otherServices}</span>
+                <span className="text-sm">Last Month</span>
+                <span className="text-sm font-medium">{fmt(overview.revenue_last_month)}</span>
               </div>
               <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">
-                <span className="font-medium">Total Revenue</span>
-                <span className="font-bold">{financialSummary.revenue.total}</span>
+                <span className="font-medium">Change</span>
+                <span className={`font-bold ${revenuePct === null ? 'text-gray-500' : revenuePct >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {revenuePct === null ? 'N/A' : `${revenuePct >= 0 ? '+' : ''}${revenuePct}%`}
+                </span>
               </div>
             </div>
           </div>
-          
-          {/* Expense Summary */}
+
           <div className="bg-green-50 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-medium text-green-800">Expense Summary</h3>
+              <h3 className="font-medium text-green-800">Bookings Summary</h3>
               <span className="text-xs bg-green-100 text-green-800 px-2 py-1 rounded">This Month</span>
             </div>
             <div className="space-y-2">
               <div className="flex justify-between">
-                <span className="text-sm">Payroll</span>
-                <span className="text-sm font-medium">{financialSummary.expenses.payroll}</span>
+                <span className="text-sm">This Month</span>
+                <span className="text-sm font-medium">{overview.bookings_this_month}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm">Food & Supplies</span>
-                <span className="text-sm font-medium">{financialSummary.expenses.foodSupplies}</span>
+                <span className="text-sm">Last Month</span>
+                <span className="text-sm font-medium">{overview.bookings_last_month}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-sm">Utilities</span>
-                <span className="text-sm font-medium">{financialSummary.expenses.utilities}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm">Maintenance</span>
-                <span className="text-sm font-medium">{financialSummary.expenses.maintenance}</span>
+                <span className="text-sm">Confirmed</span>
+                <span className="text-sm font-medium">{overview.confirmed_bookings}</span>
               </div>
               <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">
-                <span className="font-medium">Total Expenses</span>
-                <span className="font-bold">{financialSummary.expenses.total}</span>
+                <span className="font-medium">Change</span>
+                <span className={`font-bold ${bookingsDiff >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {bookingsDiff >= 0 ? '+' : ''}{bookingsDiff}
+                </span>
               </div>
             </div>
           </div>
-          
-          {/* Profit Summary */}
+
           <div className="bg-purple-50 p-4 rounded-lg">
             <div className="flex justify-between items-center mb-2">
-              <h3 className="font-medium text-purple-800">Profit Summary</h3>
-              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">This Month</span>
+              <h3 className="font-medium text-purple-800">Guest Summary</h3>
+              <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded">All Time</span>
             </div>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm">Gross Profit</span>
-                  <span className="text-sm font-medium">{financialSummary.profit.gross}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-500 h-2 rounded-full" style={{ width: '75%' }}></div>
-                </div>
+            <div className="space-y-2">
+              <div className="flex justify-between">
+                <span className="text-sm">Total Guests</span>
+                <span className="text-sm font-medium">{overview.total_guests}</span>
               </div>
-              <div>
-                <div className="flex justify-between mb-1">
-                  <span className="text-sm">Net Profit</span>
-                  <span className="text-sm font-medium">{financialSummary.profit.net}</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-500 h-2 rounded-full" style={{ width: '60%' }}></div>
-                </div>
+              <div className="flex justify-between">
+                <span className="text-sm">Pending Bookings</span>
+                <span className="text-sm font-medium">{overview.pending_bookings}</span>
               </div>
               <div className="border-t border-gray-200 pt-2 mt-2 flex justify-between">
-                <span className="font-medium">Profit Margin</span>
-                <span className="font-bold text-green-600">{financialSummary.profit.margin}</span>
+                <span className="font-medium">Total Bookings</span>
+                <span className="font-bold text-purple-700">{overview.total_bookings}</span>
               </div>
             </div>
           </div>
         </div>
-        
+
+        {/* Period selector */}
+        <div className="flex justify-end mb-4">
+          <select
+            value={chartDays}
+            onChange={e => setChartDays(Number(e.target.value))}
+            className="border rounded px-3 py-1 text-sm"
+          >
+            <option value={7}>Last 7 days</option>
+            <option value={30}>Last 30 days</option>
+            <option value={90}>Last 90 days</option>
+            <option value={365}>Last 365 days</option>
+          </select>
+        </div>
+
         {/* Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
           <div className="bg-white border border-gray-200 rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Revenue by Category</h2>
-              <select className="border rounded px-3 py-1 text-sm">
-                <option value="month">This Month</option>
-                <option value="last-month">Last Month</option>
-                <option value="year">This Year</option>
-              </select>
-            </div>
+            <h2 className="text-lg font-semibold mb-4">Daily Revenue</h2>
             <div className="h-64">
-              <Pie data={revenueCategoryData} options={pieOptions} />
+              {chartData.length > 0
+                ? <Line data={revenueLineData} options={lineOptions} />
+                : <p className="text-gray-400 text-center pt-20">No revenue data for this period.</p>
+              }
             </div>
           </div>
-          
+
           <div className="bg-white border border-gray-200 rounded-lg shadow p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Monthly Comparison</h2>
-              <select className="border rounded px-3 py-1 text-sm">
-                <option value="2023-2022">2023 vs 2022</option>
-                <option value="2022-2021">2022 vs 2021</option>
-              </select>
-            </div>
+            <h2 className="text-lg font-semibold mb-4">Daily Bookings</h2>
             <div className="h-64">
-              <Line data={comparisonData} options={lineOptions} />
+              {chartData.length > 0
+                ? <Line data={bookingsLineData} options={lineOptions} />
+                : <p className="text-gray-400 text-center pt-20">No booking data for this period.</p>
+              }
             </div>
           </div>
         </div>
-        
-        {/* Financial Records Table */}
-        <div className="bg-white rounded-lg shadow overflow-hidden">
-          <div className="p-4 border-b border-gray-200">
-            <h3 className="font-medium">Detailed Financial Records</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Description</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Amount</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Balance</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {financialRecords.map((record) => (
-                  <tr key={record.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{record.date}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        record.type === 'Revenue' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {record.type}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{record.description}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{record.amount}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{record.balance}</td>
+
+        {/* Daily Breakdown Table */}
+        {chartData.length > 0 && (
+          <div className="bg-white rounded-lg shadow overflow-hidden">
+            <div className="p-4 border-b border-gray-200">
+              <h3 className="font-medium">Daily Breakdown</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Bookings</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Revenue</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {[...chartData].reverse().map((row, i) => (
+                    <tr key={i}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.date}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{row.bookings}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{fmt(row.revenue)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </MainLayout>
   );

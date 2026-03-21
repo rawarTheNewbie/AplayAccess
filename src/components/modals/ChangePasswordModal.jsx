@@ -1,27 +1,46 @@
 import React, { useState } from 'react';
+import { changePassword } from '../../lib/ownerApi';
 
 const ChangePasswordModal = ({ isOpen, onClose }) => {
   const [formData, setFormData] = useState({
     currentPassword: '',
     newPassword: '',
-    confirmPassword: ''
+    confirmPassword: '',
   });
+  const [saving, setSaving]   = useState(false);
+  const [error, setError]     = useState(null);
+  const [success, setSuccess] = useState(false);
 
   const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError(null);
+    setSuccess(false);
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (formData.newPassword !== formData.confirmPassword) {
-      alert('Passwords do not match!');
+      setError('Passwords do not match.');
       return;
     }
-    console.log('Password change requested');
-    onClose();
+    setSaving(true);
+    setError(null);
+    try {
+      await changePassword({
+        current_password:      formData.currentPassword,
+        password:              formData.newPassword,
+        password_confirmation: formData.confirmPassword,
+      });
+      setSuccess(true);
+      setFormData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (err) {
+      const msg = err?.response?.data?.errors?.current_password?.[0]
+        || err?.response?.data?.message
+        || 'Failed to change password.';
+      setError(msg);
+    } finally {
+      setSaving(false);
+    }
   };
 
   if (!isOpen) return null;
@@ -33,12 +52,12 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
           <h3 className="text-xl font-semibold">Change Password</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700 text-2xl">&times;</button>
         </div>
-        
+
         <form onSubmit={handleSubmit}>
           <div className="mb-4">
-            <label htmlFor="currentPassword" className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-            <input 
-              type="password" 
+            <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+            <input
+              type="password"
               name="currentPassword"
               value={formData.currentPassword}
               onChange={handleChange}
@@ -46,24 +65,25 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
               required
             />
           </div>
-          
+
           <div className="mb-4">
-            <label htmlFor="newPassword" className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-            <input 
-              type="password" 
+            <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+            <input
+              type="password"
               name="newPassword"
               value={formData.newPassword}
               onChange={handleChange}
               className="w-full border rounded px-3 py-2"
               required
+              minLength={8}
             />
-            <p className="text-xs text-gray-500 mt-1">Minimum 8 characters with at least one number and one special character</p>
+            <p className="text-xs text-gray-500 mt-1">Minimum 8 characters</p>
           </div>
-          
+
           <div className="mb-6">
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-            <input 
-              type="password" 
+            <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+            <input
+              type="password"
               name="confirmPassword"
               value={formData.confirmPassword}
               onChange={handleChange}
@@ -71,20 +91,24 @@ const ChangePasswordModal = ({ isOpen, onClose }) => {
               required
             />
           </div>
-          
+
+          {error   && <p className="text-sm text-red-600 mb-3">{error}</p>}
+          {success && <p className="text-sm text-green-600 mb-3">Password changed successfully.</p>}
+
           <div className="flex justify-end border-t pt-4">
-            <button 
+            <button
               type="button"
               onClick={onClose}
               className="bg-gray-300 text-gray-700 px-4 py-2 rounded hover:bg-gray-400 transition mr-2"
             >
               Cancel
             </button>
-            <button 
+            <button
               type="submit"
-              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition"
+              disabled={saving}
+              className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition disabled:opacity-50"
             >
-              Update Password
+              {saving ? 'Updating...' : 'Update Password'}
             </button>
           </div>
         </form>
