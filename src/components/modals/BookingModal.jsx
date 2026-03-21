@@ -25,10 +25,8 @@ function formatPHP(n) {
   })}`;
 }
 
-function toGuestCount(val) {
-  if (val === "family") return 4;
-  return parseInt(val, 10) || 1;
-}
+const MIN_GUESTS = 1;
+const MAX_GUESTS = 20;
 
 /** Returns today's date string as YYYY-MM-DD */
 function todayStr() {
@@ -40,7 +38,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
   const [visitDate, setVisitDate]   = useState("");
   const [visitTime, setVisitTime]   = useState("09:00");
   const [roomType, setRoomType]     = useState(selectedRoom || "");
-  const [guests, setGuests]         = useState("2");
+  const [guests, setGuests]         = useState(2);
   const [name, setName]             = useState("");
   const [email, setEmail]           = useState("");
   const [phone, setPhone]           = useState("");
@@ -86,7 +84,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
       const result = await createBooking({
         room_id:          room.id,
         check_in:         checkIn,
-        guests:           toGuestCount(guests),
+        guests:           guests,
         payment_method:   paymentMethod,
         special_requests: specialRequests || null,
       });
@@ -136,7 +134,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
 
             {/* Visit date */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Visit Date</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Visit Date <span className="text-red-500">*</span></label>
               <input
                 type="date"
                 min={todayStr()}
@@ -150,7 +148,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
             {/* Time slot */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
-                Start Time <span className="text-gray-400 font-normal">(8-hr slot)</span>
+                Start Time <span className="text-red-500">*</span> <span className="text-gray-400 font-normal">(8-hr slot)</span>
               </label>
               <select
                 value={visitTime}
@@ -167,7 +165,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
 
             {/* Room type */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Room Type</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Room Type <span className="text-red-500">*</span></label>
               <select
                 value={roomType}
                 onChange={(e) => setRoomType(e.target.value)}
@@ -185,23 +183,47 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
 
             {/* Guests */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Guests</label>
-              <select
-                value={guests}
-                onChange={(e) => setGuests(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-              >
-                <option value="1">1 Adult</option>
-                <option value="2">2 Adults</option>
-                <option value="3">3 Adults</option>
-                <option value="4">4 Adults</option>
-                <option value="family">Family (2 Adults + 2 Children)</option>
-              </select>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Number of Guests <span className="text-red-500">*</span>
+                <span className="text-gray-400 font-normal ml-1">(max {MAX_GUESTS})</span>
+              </label>
+              <div className="flex items-center border border-gray-300 rounded-md overflow-hidden focus-within:ring-2 focus-within:ring-blue-500">
+                <button
+                  type="button"
+                  onClick={() => setGuests((g) => Math.max(MIN_GUESTS, g - 1))}
+                  disabled={guests <= MIN_GUESTS}
+                  className="px-4 py-2 text-xl font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                >
+                  −
+                </button>
+                <input
+                  type="number"
+                  min={MIN_GUESTS}
+                  max={MAX_GUESTS}
+                  value={guests}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value, 10);
+                    if (!isNaN(val)) setGuests(Math.min(MAX_GUESTS, Math.max(MIN_GUESTS, val)));
+                  }}
+                  className="flex-1 text-center py-2 text-gray-900 font-medium focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                />
+                <button
+                  type="button"
+                  onClick={() => setGuests((g) => Math.min(MAX_GUESTS, g + 1))}
+                  disabled={guests >= MAX_GUESTS}
+                  className="px-4 py-2 text-xl font-bold text-gray-600 hover:bg-gray-100 disabled:opacity-30 disabled:cursor-not-allowed select-none"
+                >
+                  +
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-gray-400">
+                {guests === 1 ? "1 guest" : `${guests} guests`}
+              </p>
             </div>
 
             {/* Name */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-gray-400 font-normal text-xs">(optional)</span></label>
               <input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
@@ -212,7 +234,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
 
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email <span className="text-gray-400 font-normal text-xs">(optional)</span></label>
               <input
                 type="email"
                 value={email}
@@ -224,7 +246,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
 
             {/* Phone */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number <span className="text-gray-400 font-normal text-xs">(optional)</span></label>
               <input
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
@@ -235,7 +257,7 @@ export default function BookingModal({ open, onClose, selectedRoom, rooms, onBoo
 
             {/* Special requests */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Special Requests</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Special Requests <span className="text-gray-400 font-normal text-xs">(optional)</span></label>
               <textarea
                 rows={2}
                 value={specialRequests}

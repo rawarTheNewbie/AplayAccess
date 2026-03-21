@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 import Layout from "./components/Layout.jsx";
 
 import Home from "./pages/Home.jsx";
@@ -22,6 +22,21 @@ import OwnerDashboard from "./pages/owner/Dashboard.jsx";
 import OwnerFinancials from "./pages/owner/Financials.jsx";
 import OwnerTransactions from "./pages/owner/Transactions.jsx";
 import StaffLogin from "./pages/StaffLogin.jsx";
+
+// Admin dashboard (protected)
+import RequireAdmin from "./components/admin/RequireAdmin.jsx";
+import AdminShell from "./components/admin/AdminShell.jsx";
+import AdminDashboard from "./pages/admin/Dashboard.jsx";
+import AdminUsers from "./pages/admin/Users.jsx";
+import AdminRooms from "./pages/admin/Rooms.jsx";
+import AdminFoods from "./pages/admin/Foods.jsx";
+import AdminServices from "./pages/admin/Services.jsx";
+import AdminInventory from "./pages/admin/Inventory.jsx";
+import AdminTransactions from "./pages/admin/Transactions.jsx";
+import AdminHistory from "./pages/admin/History.jsx";
+import AdminContent from "./pages/admin/Content.jsx";
+import AdminReviews from "./pages/admin/Reviews.jsx";
+import AdminGuests from "./pages/admin/Guests.jsx";
 
 export default function App() {
   return (
@@ -59,6 +74,29 @@ export default function App() {
       <Route path="/owner" element={<OwnerDashboard />} />
       <Route path="/owner/financials" element={<OwnerFinancials />} />
       <Route path="/owner/transactions" element={<OwnerTransactions />} />
+
+      {/* Admin routes (standalone — uses AdminShell layout) */}
+      <Route path="/admin/login" element={<Navigate to="/admin" replace />} />
+      <Route
+        path="/admin"
+        element={
+          <RequireAdmin>
+            <AdminShell />
+          </RequireAdmin>
+        }
+      >
+        <Route index element={<AdminDashboard />} />
+        <Route path="users" element={<AdminUsers />} />
+        <Route path="rooms" element={<AdminRooms />} />
+        <Route path="foods" element={<AdminFoods />} />
+        <Route path="services" element={<AdminServices />} />
+        <Route path="inventory" element={<AdminInventory />} />
+        <Route path="transactions" element={<AdminTransactions />} />
+        <Route path="history" element={<AdminHistory />} />
+        <Route path="content" element={<AdminContent />} />
+        <Route path="reviews" element={<AdminReviews />} />
+        <Route path="guests" element={<AdminGuests />} />
+      </Route>
     </Routes>
   );
 }
